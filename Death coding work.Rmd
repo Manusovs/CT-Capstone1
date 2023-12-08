@@ -1,0 +1,489 @@
+---
+title: "Death Capstone"
+author: "Scott Manusov"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+library(knitr)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+install.packages("ggplot2")
+install.packages("tidyverse")
+install.packages("knitr")
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(knitr)
+
+```
+
+## Data Overview (Causes of Death in Worldwide)
+
+This is an academic document reviewing deaths across the world. This will summarize the causes of death from 2017 on with data supplied by the WHO.
+
+```{r data}
+print("Hypothesis: Causes of death will shift both overtime within countries, and will have different leading causes between countries")
+data <- read.csv('Morticd10_part5.csv')
+head(data)
+#list of useless columns: Admin1, Subdiv, List, Frmat, IM_Frmat, Deaths 26,
+#list of useful columns: Country, Year, Cause, Sex, Deaths1 (all ages), Deaths 2-25, IM_deaths1-4
+#Slim down data to data I think I will want to use.  
+data <- data %>%
+  select(Country, Year, Cause, Sex, Deaths1, Deaths2, Deaths3, Deaths4, Deaths5, Deaths6, Deaths7, Deaths8, Deaths9, Deaths10, Deaths11, Deaths12, Deaths13, Deaths14, Deaths15, Deaths16, Deaths17, Deaths18, Deaths19, Deaths20, Deaths21, Deaths22, Deaths23, Deaths24, Deaths25, Deaths26, IM_Deaths1, IM_Deaths2, IM_Deaths3, IM_Deaths4)
+#checking that it worked
+head(data)
+#convert columns to useful names
+data <- data %>%
+  rename(
+  All_Deaths = Deaths1,
+  Age0 = Deaths2,
+  Age1 = Deaths3,
+  Age2 = Deaths4,
+  Age3 = Deaths5,
+  Age4 = Deaths6,
+  `Age5-9` = Deaths7,
+  `Ages10-14` = Deaths8,
+  `Ages15-19` = Deaths9,
+  `Ages20-24` = Deaths10,
+  `Ages25-29` = Deaths11,
+  `Ages30-34` = Deaths12,
+  `Ages35-39` = Deaths13,
+  `Ages40-44` = Deaths14,
+  `Ages45-49` = Deaths15,
+  `Ages50-54` = Deaths16,
+  `Ages55-59` = Deaths17,
+  `Ages60-64` = Deaths18,
+  `Ages65-69` = Deaths19,
+  `Ages70-74` = Deaths20,
+  `Ages75-79` = Deaths21,
+  `Ages80-84` = Deaths22,
+  `Ages85-89` = Deaths23,
+  `Ages90-94` = Deaths24,
+  `Ages95+` = Deaths25,
+  `Age??` = Deaths26,
+  `Inf0` = IM_Deaths1,
+  `Inf1-6` = IM_Deaths2,
+  `Inf7-27` = IM_Deaths3,
+  `Inf28-364` = IM_Deaths4
+  )
+#checking that it worked
+head(data)
+
+#Convert to long data format so that I can graph age groups
+long_data <- data %>%
+  gather(key = "AgeGroup", value = "Deaths", -Cause, -Country, -Sex, -Year)
+#Remove the all_Deaths group
+ages_data <- long_data %>%
+  filter(AgeGroup != "All_Deaths")
+#view what table looks like to confirm it worked (*note All_Deaths is a value)
+head(ages_data)
+  
+
+#First plot what age are people dying by year.  
+#Really slow graph (I need to be careful)
+#LEARNINGS: Data is bimodal: 
+#LEARNINGS: Mode 1 peaks at 85-89 years old.
+#LEARNINGS: A very large number of unknown ages (I should filter this out next time)
+#LEARNINGS: Infant deaths are much smaller
+ggplot(long_data, aes(x= AgeGroup, y = Deaths, fill = as.factor(Year))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Number of Deaths by Age Group and Year",
+       x = "Age Group",
+       y = "Number of Deaths") +
+  scale_fill_discrete(name = "Year") + 
+  theme_minimal()
+
+#filter out unknown ages
+ages_data <- ages_data %>%
+  filter(AgeGroup != "Ages??")
+#view what table looks like to confirm it worked (*note All_Deaths is a value)
+head(ages_data)
+
+ggplot(long_data, aes(x= AgeGroup, y = Deaths, fill = as.factor(Year))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Number of Deaths by Age Group and Year",
+       x = "Age Group",
+       y = "Number of Deaths") +
+  scale_fill_discrete(name = "Year") + 
+  theme_minimal()
+
+
+#Find just the top 10 causes of deaths worldwide.  
+top_10_causes <- ages_data %>%
+  group_by(Cause) %>%
+  summarize(TotalDeaths = sum(Deaths)) %>%
+  top_n(10, TotalDeaths) %>%
+  arrange(desc(TotalDeaths))
+print(top_10_causes)
+
+#Convert the top 10 types into a more readable function.
+#Note reran top_10_causes to confirm it worked
+ages_data <- ages_data %>%
+  mutate(Cause = case_when(
+    Cause == "A97" ~ "Viral Fevers",
+    Cause == "B65" ~ "Schistosomiasis",
+    Cause == "R94" ~ "Abnormal Symptoms",
+    Cause == "B82" ~ "Infectious and Parasitic Dis",
+    Cause == "G452" ~ "Meningitis",
+    Cause == "A938" ~ "HIV",
+    Cause == "A753" ~ "Viral Myocarditis",
+    Cause == "A95" ~ "Yellow Fever",
+    Cause == "Q73" ~ "Chromosomal Disorder", 
+    Cause == "N85" ~ "Genitourinary Dis"
+  ))
+
+#Name countries of interest (this will help sort by country as well as help me reduce my data set to make it easier to work with)
+ages_data <- ages_data %>%
+  mutate(Country = case_when(
+    Country == "1010" ~ "Algeria",
+    Country == "1100" ~ "Congo",
+    Country == "1125" ~ "Egypt",
+    Country == "1140" ~ "Ethipia",
+    Country == "1180" ~ "Ghana",
+    Country == "1190" ~ "Guinea",
+    Country == "1220" ~ "Kenya",
+    Country == "1240" ~ "Liberia",
+    Country == "1310" ~ "Morocco",
+    Country == "1370" ~ "Rwanda",
+    Country == "1410" ~ "Sierra Leonne",
+    Country == "1420" ~ "Somalia",
+    Country == "1430" ~ "S. Africa",
+    Country == "2025" ~ "Aruba",
+    Country == "2030" ~ "Bahamas",
+    Country == "2045" ~ "Belize",
+    Country == "2050" ~ "Bermuda",
+    Country == "2070" ~ "Brazil",
+    Country == "2090" ~ "Canada",
+    Country == "2190" ~ "El Salvador",
+    Country == "2280" ~ "Hondorus",
+    Country == "2290" ~ "Jamiaca",
+    Country == "2310" ~ "Mexico",
+    Country == "2350" ~ "Panama",
+    Country == "2370" ~ "Peru",
+    Country == "2450" ~ "USA",
+    Country == "3025" ~ "Bangladesh",
+    Country == "3068" ~ "China",
+    Country == "3100" ~ "India",
+    Country == "3130" ~ "Iran",
+    Country == "3140" ~ "Iraq",
+    Country == "3150" ~ "Israel",
+    Country == "3160" ~ "Japan",
+    Country == "3320" ~ "Qatar",
+    Country == "3405" ~ "UAE",
+    Country == "4018" ~ "Belarus",
+    Country == "4050" ~ "Denmark",
+    Country == "4070" ~ "Finland",
+    Country == "4080" ~ "France",
+    Country == "4084" ~ "Georgia",
+    Country == "4085" ~ "Germany",
+    Country == "4140" ~ "Greece",
+    Country == "4210" ~ "Netherlands",
+    Country == "4230" ~ "Poland",
+    Country == "4272" ~ "Russia",
+    Country == "4290" ~ "Sweden",
+    Country == "4300" ~ "Switzerland",
+    Country == "4303" ~ "Ukraine",
+    Country == "4308" ~ "UK",
+    Country == "5070" ~ "Fiji"
+      ))
+#it would have been smarter to filter first then name them
+filtered_countries <- c("Algeria", "Congo", "Egypt", "Ethiopia", "Ghana", "Guinea", "Kenya", "Liberia", "Morocco","Rwanda", "Sierra Leonne", "Somalia", "S. Africa", "Aruba", "Bahamas", "Belize", "Bermuda", "Brazil", "Canada", "El Salvador", "Hondorus", "Jamiaca", "Mexico", "Panama", "Peru", "USA", "Bangladesh", "China", "India", "Iran", "Iraq", "Israel", "Japan", "Qatar", "UAE", "Belarus", "Denmark", "Finland", "France", "Georgia", "Germany", "Greece", "Netherlands", "Poland", "Russia", "Sweden", "Switzerland", "Ukraine", "UK", "Fiji")
+
+country_filtered <- ages_data %>%
+  filter(Country %in% filtered_countries)
+
+filtered_causes <- c( "Viral Fevers", "Schistosomiasis", "Abnormal Symptoms", "Infectious and Parasitic Dis", "Meningitis", "HIV", "Viral Myocarditis", "Yellow Fever", "Chromosomal Disorder", "Genitourinary Dis")
+
+cause_filtered <- ages_data %>%
+  filter(Cause %in% filtered_causes)
+
+double_filtered <- cause_filtered %>%
+  filter(Country %in% filtered_countries)
+
+#graph the the amount of death from the leading causes in my specific countries
+ggplot(double_filtered, aes(x= Country, y = Deaths, fill = Cause)) +
+  geom_bar(stat = "identity", position = "stack") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Cause of Death by Country",
+       x= "Country",
+       y = "Deaths",
+       fill = "Cause")
+
+
+#Trouble shooting 
+table_data <- double_filtered %>%
+  select(Country, Cause, Deaths) %>%
+  group_by(Country, Cause) %>%
+  summarize(TotalDeaths = sum(Deaths)) %>%
+  ungroup()
+
+print(kable(table_data))
+#Graph single country cause of death
+Algeria_data <- ages_data %>%
+  filter(Country == "Algeria")
+leading_causes <- Algeria_data %>%
+  summarize(TotalDeaths = sum(Deaths)) %>%
+  top_n(5, TotalDeaths) %>%
+  arrange(desc(TotalDeaths))
+Algeria_filtered <- Algeria_data %>% 
+  filter(Cause %in% leading_causes$Cause)
+ggplot(Algeria_filtered, aes(x= Cause, y= Deaths, fill = Cause)) +
+  geom_bar(stat = "identity") + 
+  labs(title = paste("Leading Causes of Death in Algeria"),
+       x = "Cause",
+       y = "Deaths",
+       fille = "Cause") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+#Trouble shooting -found several of the countries in the key are not in the data set 
+print(leading_causes)
+#update filtered countries:
+filtered_countries <- c("Egypt", "S. Africa", "Aruba", "Bermuda", "Brazil", "Canada", "El Salvador", "Mexico", "Panama", "Peru", "USA", "Bangladesh", "Israel", "Japan", "Qatar", "UAE", "Belarus", "Denmark", "Finland", "France", "Georgia", "Germany", "Greece", "Netherlands", "Poland", "Russia", "Sweden", "Switzerland", "Ukraine", "UK")
+
+country_filtered <- ages_data %>%
+  filter(Country %in% filtered_countries)
+
+#Retry with country in dataset (note swapped Egypt and Ukraine, since Ukraine is the first country)
+Egypt_data <- long_data %>%
+  filter(Country == 4303)
+#leading_causes <- Egypt_data %>%
+ # summarize(TotalDeaths = sum(Deaths)) %>%
+  #top_n(5, TotalDeaths) %>%
+  #arrange(desc(TotalDeaths))
+Egypt_filtered <- Egypt_data %>% 
+  #filter(Cause %in% leading_causes$Cause)
+ggplot(Egypt_filtered, aes(x= Cause, y= Deaths, fill = Cause)) +
+  geom_bar(stat = "identity") + 
+  labs(title = paste("Leading Causes of Death in Egypt"),
+       x = "Cause",
+       y = "Deaths",
+       fill = "Cause") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#troubleshooting
+print(Egypt_filtered)
+unique(long_data$Country)
+print(Egypt_data)
+head(long_data)
+
+#try again (worked without filtering for top causes):
+Egypt_filtered <- Egypt_data
+
+ggplot(Egypt_filtered, aes(x= Cause, y =Deaths, fill = Cause)) + 
+  geom_bar(stat = "identity") +
+  labs(title = paste("Causes of Death in Egypt"),
+       x = "Cause",
+       y = "Deaths",
+       fill = "Cause") + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#adding top causes back in and correcting back to Ukraine:
+#just filtering by country
+Ukraine_data <- long_data %>%
+  filter(Country == 4303)
+# finding top causes
+top5causes <- Ukraine_data %>%
+  group_by(Cause) %>%
+  summarize(TotalDeaths = sum(Deaths)) 
+print(top5causes) # %>%
+  top_n(5, TotalDeaths)
+  
+str(Ukraine_data)
+Ukraine_data <- Ukraine_data[complete.cases(Ukraine_data$Deaths), ]
+print(unique(Ukraine_data$Deaths))
+#fixing the summarize step:
+Ukraine_data <- long_data %>%
+  filter(Country == 4303)
+# finding top causes
+top5causes <- Ukraine_data %>%
+  group_by(Cause) %>%
+  summarize(TotalDeaths = sum(Deaths)) %>%
+  arrange(desc(TotalDeaths)) %>%
+  slice_head(n = 5)
+
+print(top5causes) 
+
+#filter for only top causes 
+# this isn't needed any more: Ukraine_filtered <- Ukraine_data %>%
+  
+
+ggplot(top5causes, aes(x= Cause, y =TotalDeaths, fill = Cause)) + 
+  geom_bar(stat = "identity") +
+  labs(title = paste("Causes of Death in Ukraine"),
+       x = "Cause",
+       y = "Deaths",
+       fill = "Cause") + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+head(Ukraine_data)
+head(top5causes)
+
+# finding top causes with years
+top5causeyears <- Ukraine_data %>%
+  group_by(Cause, Year) %>%
+  summarize(TotalDeaths = sum(Deaths)) 
+
+print(top5causeyears) 
+
+top5causeyears <- top5causeyears %>%    
+  arrange(desc(TotalDeaths)) %>%
+  slice_head(n = 5)
+
+print(top5causeyears)
+#new graph years and causes (realized I didn't limit to top 5 causes but still looks good):
+ggplot(top5causeyears, aes(x=as.factor(Year), y = TotalDeaths, fill = Cause)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Ukraine deaths by year and cause",
+       x = "Year",
+       y = "Deaths",
+       fill = "Cause") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Repeat the test, with several other countries:
+#Ukraine
+Ukraine_data <- long_data %>%
+  filter(Country == 4303)
+
+top5causeyears <- Ukraine_data %>%
+  filter(AgeGroup == "All_Deaths" ) %>%
+  group_by(Cause, Year) %>%
+  summarize(TotalDeaths = sum(Deaths)) 
+
+print(top5causeyears) 
+
+
+ggplot(top5causeyears, aes(x=as.factor(Year), y = TotalDeaths, fill = Cause)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Ukraine deaths by year and cause",
+       x = "Year",
+       y = "Deaths",
+       fill = "Cause") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Egypt (overwhelmed the key)
+Egypt_data <- long_data %>%
+  filter(Country == 1125)
+
+top5causeyears <- Egypt_data %>%
+  filter(AgeGroup == "All_Deaths" ) %>%
+  group_by(Cause, Year) %>%
+  summarize(TotalDeaths = sum(Deaths)) 
+
+print(top5causeyears) 
+
+
+ggplot(top5causeyears, aes(x=as.factor(Year), y = TotalDeaths, fill = Cause)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Egypt deaths by year and cause",
+       x = "Year",
+       y = "Deaths",
+       fill = "Cause") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#try to create a function that stops the key from getting overwhelmed
+country_bar <- function(code, country_name) {
+  country_data <- long_data %>%
+    filter(Country == code, AgeGroup == "All_Deaths") %>%
+    group_by(Cause, Year) %>%
+    summarize(TotalDeaths = sum(Deaths)) %>%
+    arrange(desc(TotalDeaths)) %>%
+    top_n(5)
+  
+  ggplot(country_data, aes(x = Year, y = TotalDeaths, fill = Cause))+
+    geom_bar(stat = "identity") +
+    labs(title = paste(country_name, "Deaths by cause and year"),
+         x = "Year",
+         y = "Deaths",
+         fill = " Cause") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+ukraine_plot <- country_bar(4303, "Ukraine")
+print(ukraine_plot)
+egypt_plot <- country_bar(1125, "Egypt") +
+  scale_fill_manual(breaks = country_data$Cause[1:10])
+print(egypt_plot)
+safrica_plot <- country_bar(1430, "South Africa")
+print(safrica_plot)
+aruba_plot <- country_bar(4303, "Aruba")
+print(aruba_plot)
+bermuda_plot <- country_bar(2050, "Bermuda")
+print(bermuda_plot)
+brazil_plot <- country_bar(2070, "Brazil")
+print(brazil_plot)
+canada_plot <- country_bar(2090, "Canada")
+print(canada_plot)
+elsal_plot <- country_bar(2190, "El Salvador")
+print(elsal_plot)
+mexico_plot <- country_bar(2310, "Mexico")
+print(mexico_plot)
+panama_plot <- country_bar(2350, "Panama")
+print(panama_plot)
+peru_plot <- country_bar(2370, "Peru")
+print(peru_plot)
+usa_plot <- country_bar(2450, "USA")
+print(usa_plot)
+iraq_plot <- country_bar(31400, "Iraq")
+print(iraq_plot)
+israel_plot <- country_bar(3150, "Israel")
+print(israel_plot)
+japan_plot <- country_bar(3160, "Japan")
+print(peru_plot)
+qatar_plot <- country_bar(3320, "Qatar")
+print(qatar_plot)
+uae_plot <- country_bar(3405, "UAE")
+print(uae_plot)
+belarus_plot <- country_bar(4018, "Belarus")
+print(belarus_plot)
+denmark_plot <- country_bar(4050, "Denmark")
+print(denmark_plot)
+finland_plot <- country_bar(4070, "Finland")
+print(finland_plot)
+france_plot <- country_bar(4080, "France")
+print(france_plot)
+georgia_plot <- country_bar(4084, "Georgia")
+print(georgia_plot)
+germany_plot <- country_bar(4085, "Germany")
+print(germany_plot)
+germany_plot <- country_bar(4140, "Greece")
+print(germany_plot)
+germany_plot <- country_bar(4210, "Netherlands")
+print(germany_plot)
+germany_plot <- country_bar(4230, "Poland")
+print(germany_plot)
+germany_plot <- country_bar(4272, "Russia")
+print(germany_plot)
+germany_plot <- country_bar(4290, "Sweden")
+print(germany_plot)
+germany_plot <- country_bar(4300, "Switzerland")
+print(germany_plot)
+germany_plot <- country_bar(4303, "Ukraine")
+print(germany_plot)
+germany_plot <- country_bar(4308, "UK")
+print(germany_plot)
+
+print("Hypothesis: Causes of death will shift both overtime within countries, and will have different leading causes between countries")
+print("Conclusion 1: Causes of death from 2017 - 2019 did not shift within most if any country\n Conclusion 2: Countries not only have different causes, but use different naming and sorting systems, making it difficult and time taking to determine the full extent of the differences")
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
